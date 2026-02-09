@@ -5,3 +5,6 @@
 benchmarks/outputs/
 benchmarks/failures/
 benchmarks/inputs/
+
+.env
+
