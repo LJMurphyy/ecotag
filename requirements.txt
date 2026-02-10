@@ -4,4 +4,4 @@ easyocr
 opencv-python
 numpy
 psutil
-
+python-dotenv

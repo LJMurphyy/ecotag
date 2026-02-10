@@ -1,52 +1,105 @@
-# Benchmarking:
-We benchmarked the current CPU-based OCR pipeline (EasyOCR + Multi-variant Preprocessing) on the "Cropped Tags" dataset. The system prioritizes accuracy over speed, running 5 different image processing variants per tag to ensure text extraction. While accuracy is strong for an open-source solution (72%), the latency (26s/image) indicates a need for optimization before scaling.
+# Benchmarks
 
-### Test Environemnt:
-This shows the current environment I have been working on.
-#### OS
-- **Product:** macOS
-- **Version:** 15.7.3
-- **Build:** 24G419
+## Setup
 
-#### CPU
-- **Model:** Apple M2 Pro
-- **Cores:** 10
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Configure API keys:
+   ```bash
+   cp .env.example .env
+   # then fill GEMINI_API_KEY and/or MISTRAL_API_KEY
+   ```
 
-#### Python
-- **Python:** 3.13.3
-- **pip:** 25.3
+The benchmark loads `.env` automatically via `python-dotenv`.
 
----
+## Default Run (Gemini + Mistral OCR2)
 
-### Performance Metrics:
+```bash
+python benchmarks/run_bench.py
+```
 
-| Metric | Result | Notes |
-|---|---|---|
-| **Success Rate** | 72.3% (55/76) | Successfully extracted Origin or Materials. |
-| **Avg Latency** | 25.94s / image | High due to 5x brute-force inference loop. |
-| **Throughput**| 0.04 img / sec | Current capacity: ~144 images per hour. |
-| **Peak RAM** | 1.1 GB | Very lightweight; runs easily on consumer hardware. |
-| **Min Latency** | 6.05s | Occurs when the "Original" image works immediately. |
-| **Max Latency** | 49.38s | Occurs when the system forces all 5 filters. |
+## Limited Smoke Test
 
----
+```bash
+python benchmarks/run_bench.py --limit 2
+```
 
-### Failure Analysis
-Identified two primary failures: 
-1. **Data Extraction Failures:** The OCR detected text, but the <span style="padding:2px 4px;border-radius:999px;margin:1px;background:#333;color:#d42432;font-weight:600;">tag parser</span>could not find a specific Country or Material. This suggests the OCR output was <span style="padding:2px 4px;border-radius:999px;margin:1px;background:#333;color:#d9aa59;font-weight:600;">garbage</span> or the tag contained only washing instructions.
+## Useful Options
 
----
+```bash
+python benchmarks/run_bench.py \
+  --input-dir cropped_tags \
+  --run-id my_run_001 \
+  --limit 20 \
+  --pipelines gemini,mistral_ocr2 \
+  --workers 2 \
+  --ensemble field_union
+```
 
-### Reccomendations:
-Optimize the Loop: We can drop latency by running the 5 variants in parallel or training a lightweight classifier to pick the best filter before OCR.
+- `--pipelines` accepts: `gemini`, `mistral_ocr2`, `easyocr`
+- `--ensemble` accepts: `none`, `field_union`
 
----
+## Accuracy Manifest (Optional)
 
-### Next Steps
-**Implement "Early Exit":** Currently, the system runs all 5 filters even if the first one yields 99%. Adding an exit condition (e.g., if confidence > 85%: return) will likely drop average latency.
+If `benchmarks/inputs/manifest.csv` exists, accuracy metrics are computed.
 
-**Filter Profiling:** Determine which of the 5 image filters contributes most to success. Such as if "Bilateral Filter" accounts for 50% of the runtime but only 1% of the success, we should remove it.
+Expected schema:
 
-**Parallelization:** Python's multiprocessing could allow us to run the 5 filters simultaneously, potentially capping latency.
+```csv
+filename,gt_origin_country,gt_materials
+img_001.jpg,china,cotton;polyester
+img_002.jpg,india,cotton
+```
 
-**Test Different CPUs**: Utilizing 
+Rules:
+
+- `filename` must match image filename in the input directory.
+- `gt_materials` is `;`-separated material names.
+- Comparisons are case-insensitive.
+
+## Outputs
+
+Each run writes to:
+
+`benchmarks/outputs/<run_id>/`
+
+Artifacts:
+
+- `per_item.csv`: per-image status, latency, parsed fields, and errors.
+- `summary.json`: config, dataset stats, performance, accuracy, system metrics.
+- `report.md`: environment, methodology, results table, takeaways, and failures.
+
+### Goal:
+
+Parallelize two VLM/OCR pipelines (Gemini + Mistral OCR2), measure performance + reliability, and document a reproducible baseline on a representative dataset.
+
+### Metrics + Observations (Run ID: `20260209_170758`)
+
+| Ticket requirement                    | How we measure it                                                                                                                                        |                                                     Result (this run) | Notes / interpretation                                                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------: | --------------------------------------------------------------------------------------------------------------------- |
+| **Latency (per image)**               | Per-item latency recorded in `per_item.csv`. Ensemble latency = `max(pipeline latencies)` for that image (because pipelines run concurrently per image). |         **Avg:** 11.1663s \| **P95:** 24.0030s \| **Worst:** 60.5415s | P95 shows “tail latency” (slowest ~5%). One image was a major outlier (`IMG_8570.JPG`).                               |
+| **Throughput (images/sec)**           | `images_processed / total_wall_time`                                                                                                                     |                                                  **0.1783 items/sec** | 76 images / 426.2661s. Throughput varies with API rate limits and timeouts.                                           |
+| **CPU utilization**                   | Process-level average CPU during run, saved to `summary.json` and `report.md`.                                                                           |                                                       **13.005% avg** | Low CPU suggests the benchmark is mostly **network/API bound**, not compute bound.                                    |
+| **Memory usage**                      | Peak RSS (resident set size) during the run.                                                                                                             |                                                   **295.250 MB peak** | Memory stayed modest and stable.                                                                                      |
+| **Accuracy proxy: OCR success %**     | % of images where a pipeline returns non-empty OCR text (`SUCCESS` vs `OCR_FAIL/ERROR/TIMEOUT`).                                                         |     **Gemini:** 69.74% \| **Mistral:** 94.74% \| **Ensemble:** 73.68% | Proxy only: measures “did we get text?” not correctness of extracted fields.                                          |
+| **Accuracy proxy: Field success %**   | % of images where the parser extracts at least one target field (e.g., origin country/materials) from OCR text.                                          |     **Gemini:** 56.58% \| **Mistral:** 61.84% \| **Ensemble:** 73.68% | Ensemble improves extraction via field union across pipelines.                                                        |
+| **Failure cases / bottlenecks**       | Inspect slowest-10 latency + per-image error logs in `report.md` and `per_item.csv`.                                                                     | Gemini: **HTTP 429 RESOURCE_EXHAUSTED** \| Mistral: **TIMEOUT (30s)** | Main bottlenecks were **rate limiting (429)** and **timeouts**. Tail latency dominated by a few slow images/requests. |
+| **Representative dataset**            | Benchmark on diverse, real garment-care tag images.                                                                                                      |                                    **76 images** from `cropped_tags/` | Includes varied lighting, blur, orientation, small fonts, and layouts typical of real tag photos.                     |
+| **Consistent & reproducible results** | Same command produces same artifact structure; to reduce variance, run multiple trials and report mean/std.                                              |                           Artifacts at `benchmarks/outputs/<run_id>/` | Results can vary due to external API conditions (rate limits, network). Recommend **3 trials** and report mean/std.   |
+
+### Reproducibility Checklist
+
+- **Dependencies:** pinned via `requirements-lock.txt` (or generate one with `pip freeze > requirements-lock.txt`)
+- **Fixed dataset:** run against the same `cropped_tags/` directory
+- **Record command:** store the exact command and `run_id`
+- **Multiple trials:** run 3 times and report mean/p95 range (important due to 429/timeout variability)
+
+### Notes on “Accuracy”
+
+Without `benchmarks/inputs/manifest.csv`, “accuracy” here is proxy-based:
+
+- **OCR success %** = “did we get any text?”
+- **Field success %** = “did the parser extract target fields?”
+  To measure real accuracy, add a `manifest.csv` ground truth and rerun.
