@@ -50,7 +50,7 @@ except ImportError as exc:
     sys.exit(1)
 
 
-ALLOWED_PIPELINES = ["gemini", "mistral_ocr2", "easyocr"]
+ALLOWED_PIPELINES = ["gemini", "mistral_ocr2", "easyocr", "openai_gpt52"]
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 
 
@@ -312,7 +312,7 @@ def process_image(
 ) -> Dict[str, Any]:
     results: Dict[str, Dict[str, Any]] = {}
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=max(1, len(pipeline_order))) as executor:
         futures = {
             executor.submit(_safe_pipeline_call, runners[name], image_path, name): name
             for name in pipeline_order
@@ -563,6 +563,7 @@ def write_report_md(
     lines.append(f"- Platform: {platform.platform()}")
     lines.append(f"- GEMINI_API_KEY set: {bool(os.getenv('GEMINI_API_KEY', '').strip())}")
     lines.append(f"- MISTRAL_API_KEY set: {bool(os.getenv('MISTRAL_API_KEY', '').strip())}")
+    lines.append(f"- OPENAI_API_KEY set: {bool(os.getenv('OPENAI_API_KEY', '').strip())}")
     lines.append("")
 
     lines.append("## Dataset")
@@ -573,7 +574,9 @@ def write_report_md(
 
     lines.append("## Methodology")
     lines.append(f"- Pipelines: {', '.join(args.pipelines_list)}")
-    lines.append("- Per-image pipeline concurrency: ThreadPoolExecutor(max_workers=2)")
+    lines.append(
+        f"- Per-image pipeline concurrency: ThreadPoolExecutor(max_workers={max(1, len(args.pipelines_list))})"
+    )
     lines.append(f"- Image-level workers: {args.workers}")
     lines.append(f"- Ensemble mode: {args.ensemble}")
     lines.append("- Ensemble latency: max(pipeline latencies) per image")
@@ -650,7 +653,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--pipelines",
         default="gemini,mistral_ocr2",
-        help="Comma-separated pipelines (gemini,mistral_ocr2,easyocr)",
+        help="Comma-separated pipelines (gemini,mistral_ocr2,easyocr,openai_gpt52)",
     )
     parser.add_argument("--workers", type=int, default=1, help="Concurrent image workers")
     parser.add_argument(
