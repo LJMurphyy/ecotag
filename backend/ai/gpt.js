@@ -84,9 +84,21 @@ const TAG_SCHEMA = {
   },
 };
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+let openaiClient = null;
+
+function getOpenAIClient() {
+  if (openaiClient) {
+    return openaiClient;
+  }
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
+  openaiClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+  return openaiClient;
+}
 
 export async function extractTagFromImage(dataUrl) {
+  const openai = getOpenAIClient();
   const response = await openai.chat.completions.create({
     model: MODEL,
     messages: [
