@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
-import { TagApiResponse } from "../types/api";
+import { addScan } from "../storage/scans";
+import { ParsedTag, TagApiResponse } from "../types/api";
 
 export interface NormalizedApiError {
   status: number;
@@ -63,6 +64,45 @@ function inferFilename(imageUri: string): string {
   return "upload.jpg";
 }
 
+function makeScanId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildDisplayName(parsed: ParsedTag | undefined): string {
+  const materials = parsed?.materials ?? [];
+  const top = materials
+    .slice()
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 2)
+    .map((m) => `${m.pct}% ${m.fiber}`);
+
+  return top.length > 0 ? top.join(" + ") : "Tag scan";
+}
+
+function recordScan(params: {
+  success: 0 | 1;
+  co2e_grams: number;
+  display_name: string | null;
+  category: string | null;
+  error_code: string | null;
+  result: unknown;
+}): void {
+  try {
+    addScan({
+      id: makeScanId(),
+      created_at: Date.now(),
+      success: params.success,
+      co2e_grams: params.co2e_grams,
+      display_name: params.display_name,
+      category: params.category,
+      error_code: params.error_code,
+      result: params.result,
+    });
+  } catch (err) {
+    console.warn("[EcoTag] Failed to write scan history:", err);
+  }
+}
+
 function normalizeErrorPayload(
   status: number,
   statusText: string,
@@ -119,6 +159,20 @@ export async function tagImage(imageUri: string): Promise<TagApiResponse> {
   }
 
   if (!res.ok) {
+    if (jsonBody && typeof jsonBody === "object") {
+      const body = jsonBody as { error?: { code?: string; message?: string } };
+      if (body.error) {
+        recordScan({
+          success: 0,
+          co2e_grams: 0,
+          display_name: "Tag scan",
+          category: null,
+          error_code: body.error.code ?? null,
+          result: { error: body.error },
+        });
+      }
+    }
+
     if (jsonBody) {
       throw normalizeErrorPayload(res.status, res.statusText, jsonBody);
     }
@@ -144,5 +198,15 @@ export async function tagImage(imageUri: string): Promise<TagApiResponse> {
     } satisfies NormalizedApiError;
   }
 
-  return parsed as TagApiResponse;
+  const response = parsed as TagApiResponse;
+  recordScan({
+    success: 1,
+    co2e_grams: Math.round(response.emissions.total_kgco2e * 1000),
+    display_name: buildDisplayName(response.parsed),
+    category: null,
+    error_code: null,
+    result: { parsed: response.parsed, emissions: response.emissions },
+  });
+
+  return response;
 }

@@ -36,7 +36,8 @@
         {
           "photosPermission": "EcoTag needs photo library access to upload label images."
         }
-      ]
+      ],
+      "expo-sqlite"
     ]
   }
 }

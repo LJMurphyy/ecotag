@@ -12,6 +12,7 @@ import { StatusBar } from "expo-status-bar";
 import { colors } from "../src/theme";
 import { MetricsProvider } from "../src/context/MetricsContext";
 import { CameraWarmupProvider } from "../src/context/CameraWarmupContext";
+import { initDb } from "../src/storage/db";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,6 +29,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    initDb();
+  }, []);
 
   if (!fontsLoaded) {
     return null;
