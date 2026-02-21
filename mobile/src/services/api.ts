@@ -53,6 +53,8 @@ function inferMimeType(imageUri: string): string {
   if (normalized.endsWith(".jpeg") || normalized.endsWith(".jpg")) {
     return "image/jpeg";
   }
+  if (normalized.endsWith(".heic")) return "image/heic";
+  if (normalized.endsWith(".webp")) return "image/webp";
   return "application/octet-stream";
 }
 

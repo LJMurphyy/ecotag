@@ -1,12 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, typography, spacing } from "../../src/theme";
 import { clearAllScans, listScans } from "../../src/storage/scans";
 import { ScanRecord } from "../../src/storage/types";
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<ScanRecord[]>([]);
 
   const refresh = useCallback(() => {
@@ -30,13 +31,23 @@ export default function HistoryScreen() {
     const when = new Date(item.created_at).toLocaleString();
     const totalKg = (item.co2e_grams / 1000).toFixed(2);
     return (
-      <View style={styles.row}>
+      <Pressable
+        style={styles.row}
+        onPress={() => {
+          if (item.result_json && item.success === 1) {
+            router.push({
+              pathname: "/results",
+              params: { status: "success", data: item.result_json },
+            });
+          }
+        }}
+      >
         <Text style={styles.rowTitle}>{item.display_name ?? "Tag scan"}</Text>
         <Text style={styles.rowSubtitle}>{when}</Text>
         <Text style={styles.rowValue}>{totalKg} kgCO2e</Text>
-      </View>
+      </Pressable>
     );
-  }, []);
+  }, [router]);
 
   const renderSeparator = useCallback(() => <View style={styles.separator} />, []);
 
