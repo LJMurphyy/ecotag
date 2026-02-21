@@ -5,7 +5,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing } from "../src/theme";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { TagApiResponse } from "../src/types/api";
+import { CO2Gauge } from "../src/components/CO2Gauge";
+import { BreakdownRow } from "../src/components/BreakdownRow";
+import { TagApiResponse, BREAKDOWN_LABELS, BREAKDOWN_ORDER } from "../src/types/api";
+
+function formatCareValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
 
 function getFriendlyErrorMessage(code?: string, fallback?: string): string {
   if (code === "MISSING_IMAGE") {
@@ -44,11 +51,22 @@ export default function ResultsScreen() {
   const isSuccess = status === "success" && !!successPayload;
   const parsed = successPayload?.parsed;
   const emissions = successPayload?.emissions;
-  const totalKg = emissions ? emissions.total_kgco2e.toFixed(2) : "N/A";
   const materialSummary = parsed?.materials
     ?.map((m) => `${m.pct}% ${m.fiber}`)
     .join(", ");
   const friendlyMessage = getFriendlyErrorMessage(errorCode, errorMessage);
+
+  const breakdownRows = useMemo(() => {
+    if (!emissions?.breakdown) return [];
+    const bd = emissions.breakdown;
+    return BREAKDOWN_ORDER.filter(
+      (key) => typeof bd[key] === "number" && bd[key] > 0,
+    ).map((key) => ({
+      key,
+      label: BREAKDOWN_LABELS[key] ?? key,
+      value: bd[key],
+    }));
+  }, [emissions]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -67,26 +85,45 @@ export default function ResultsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {isSuccess ? (
-          <View style={styles.card}>
-            <Text style={styles.successTitle}>Tag analyzed successfully</Text>
-            <Text style={styles.metric}>
-              Total emissions:{" "}
-              <Text style={styles.metricStrong}>{totalKg} kgCO2e</Text>
-            </Text>
-            <Text style={styles.rowLabel}>
-              Country: <Text style={styles.rowValue}>{parsed?.country || "N/A"}</Text>
-            </Text>
-            <Text style={styles.rowLabel}>
-              Materials:{" "}
-              <Text style={styles.rowValue}>{materialSummary || "N/A"}</Text>
-            </Text>
-            <Text style={styles.rowLabel}>
-              Care:{" "}
-              <Text style={styles.rowValue}>
-                Wash {parsed?.care.washing || "N/A"}, Dry {parsed?.care.drying || "N/A"}
+          <>
+            <CO2Gauge totalKgCO2e={emissions!.total_kgco2e} />
+
+            <View style={styles.card}>
+              <Text style={styles.successTitle}>Emissions Breakdown</Text>
+              {breakdownRows.map((row) => (
+                <BreakdownRow
+                  key={row.key}
+                  label={row.label}
+                  kgValue={row.value}
+                />
+              ))}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.successTitle}>Tag Details</Text>
+              {parsed?.country ? (
+                <Text style={styles.rowLabel}>
+                  Country: <Text style={styles.rowValue}>{parsed.country}</Text>
+                </Text>
+              ) : null}
+              <Text style={styles.rowLabel}>
+                Materials:{" "}
+                <Text style={styles.rowValue}>{materialSummary || "Not detected"}</Text>
               </Text>
-            </Text>
-          </View>
+              {[
+                { label: "Washing", value: formatCareValue(parsed?.care.washing) },
+                { label: "Drying", value: formatCareValue(parsed?.care.drying) },
+                { label: "Ironing", value: formatCareValue(parsed?.care.ironing) },
+                { label: "Dry cleaning", value: formatCareValue(parsed?.care.dry_cleaning) },
+              ]
+                .filter((row) => row.value !== null)
+                .map((row) => (
+                  <Text key={row.label} style={styles.rowLabel}>
+                    {row.label}: <Text style={styles.rowValue}>{row.value}</Text>
+                  </Text>
+                ))}
+            </View>
+          </>
         ) : (
           <View style={styles.errorCard}>
             <Text style={styles.errorTitle}>We couldn't analyze that image</Text>
@@ -140,14 +177,6 @@ const styles = StyleSheet.create({
   successTitle: {
     ...typography.h2,
     color: colors.text,
-  },
-  metric: {
-    ...typography.body,
-    color: colors.text,
-  },
-  metricStrong: {
-    ...typography.h2,
-    color: colors.primary,
   },
   rowLabel: {
     ...typography.bodySmall,

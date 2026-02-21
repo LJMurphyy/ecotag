@@ -6,7 +6,6 @@ import multer from "multer";
 import * as gpt from "../ai/gpt.js";
 import { estimateEmissions } from "../ai/emissions.js";
 import fs from "node:fs";
-import path from "node:path";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -65,13 +64,7 @@ router.post("/tag", upload.single("image"), async (req, res) => {
   }
 
   try {
-    const ext = path.extname(filePath).toLowerCase().replace(".", "");
-    const mime =
-      ext === "jpg" || ext === "jpeg"
-        ? "image/jpeg"
-        : ext === "png"
-          ? "image/png"
-          : "image/jpeg";
+    const mime = req.file.mimetype || "image/jpeg";
     const b64 = fs.readFileSync(filePath, "base64");
     const dataUrl = `data:${mime};base64,${b64}`;
 
@@ -87,6 +80,7 @@ router.post("/tag", upload.single("image"), async (req, res) => {
         },
       });
     }
+    console.log("[tag] GPT parsed:", JSON.stringify(parsed, null, 2));
     parsed = normalizeParsedForEmissions(parsed);
     // Calculate emissions
     let emissions;

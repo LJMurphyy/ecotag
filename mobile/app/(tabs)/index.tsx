@@ -1,15 +1,22 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, typography, spacing } from "../../src/theme";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
-import { GarmentCard } from "../../src/components/GarmentCard";
 import { InfoCard } from "../../src/components/InfoCard";
-import { MOCK_HISTORY } from "../../src/constants/mock";
+import { listScans } from "../../src/storage/scans";
+import { ScanRecord } from "../../src/storage/types";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setRecentScans(listScans(2));
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -36,17 +43,34 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {MOCK_HISTORY.slice(0, 2).map((item) => (
-          <GarmentCard
-            key={item.id}
-            name={item.garment_name}
-            type={item.garment_type}
-            score={item.score}
-            description={item.description}
-            timestamp={item.timestamp}
-            onPress={() => router.push("/results")}
-          />
-        ))}
+        {recentScans.length === 0 ? (
+          <Text style={styles.emptyText}>No recent scans</Text>
+        ) : (
+          recentScans.map((scan) => {
+            const when = new Date(scan.created_at).toLocaleString();
+            const totalKg = (scan.co2e_grams / 1000).toFixed(2);
+            return (
+              <Pressable
+                key={scan.id}
+                style={styles.scanCard}
+                onPress={() => {
+                  if (scan.result_json && scan.success === 1) {
+                    router.push({
+                      pathname: "/results",
+                      params: { status: "success", data: scan.result_json },
+                    });
+                  }
+                }}
+              >
+                <Text style={styles.scanName}>
+                  {scan.display_name ?? "Tag scan"}
+                </Text>
+                <Text style={styles.scanDate}>{when}</Text>
+                <Text style={styles.scanValue}>{totalKg} kgCO2e</Text>
+              </Pressable>
+            );
+          })
+        )}
 
         <InfoCard title="About EcoTag" />
 
@@ -89,6 +113,32 @@ const styles = StyleSheet.create({
   viewAll: {
     ...typography.link,
     color: colors.link,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.disabled,
+    textAlign: "center",
+    marginTop: 12,
+  },
+  scanCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: spacing.radius,
+    backgroundColor: colors.white,
+    padding: spacing.elementV,
+    gap: 6,
+  },
+  scanName: {
+    ...typography.body,
+    color: colors.text,
+  },
+  scanDate: {
+    ...typography.bodySmall,
+    color: colors.disabled,
+  },
+  scanValue: {
+    ...typography.h2,
+    color: colors.primary,
   },
   footer: {
     ...typography.bodySmall,
