@@ -13,7 +13,7 @@ import { getCacheConfig, isMockOcrEnabled } from "../cache/config.js";
 import { countCacheEntries, lookup, resetCacheEntries, store } from "../cache/service.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "/tmp/uploads/" });
 let tagExtractor = gpt.extractTagFromImage;
 
 function isPlainObject(value) {
