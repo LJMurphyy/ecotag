@@ -11,7 +11,7 @@ import path from "node:path";
 import { isMockOcrEnabled } from "../cache/config.js";
 
 const router = express.Router();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "/tmp/uploads/" });
 let tagExtractor = gpt.extractTagFromImage;
 
 function isPlainObject(value) {
