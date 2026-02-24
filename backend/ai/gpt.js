@@ -9,7 +9,18 @@ dotenv.config();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = "gpt-5.2";
 
-const SYSTEM_PROMPT = `You are an expert at reading clothing care/composition tags.\nGiven an image of a garment tag, extract:\n  • country  – the country of origin or manufacture (null if not visible)\n  • materials – an array of {fiber, pct} objects for the fabric composition ([] if not visible)\n  • care – an object with exactly four keys: washing, drying, ironing, dry_cleaning. Each key must be present and set to one of the allowed values below, or null if not visible.\n    - washing: machine_wash_cold, machine_wash_warm, machine_wash_hot, machine_wash_gentle, hand_wash_cold, hand_wash_warm\n    - drying: tumble_dry_low, tumble_dry_medium, tumble_dry_high, lay_flat_to_dry, line_dry, do_not_tumble_dry\n    - ironing: iron_low, iron_medium, iron_high, do_not_iron\n    - dry_cleaning: dry_clean, dry_clean_only\nIf you cannot determine a value, use null.\nReturn ONLY the JSON object. Do not return care as a string. Be precise with percentages, fiber names, and care keys.`;
+const SYSTEM_PROMPT = `You are an expert at reading clothing care/composition tags.
+Step 1: Read ALL visible text on the tag exactly as printed and put it in the "ocr_text" field.
+Step 2: Using the ocr_text you just extracted, you MUST populate the structured fields below. Do NOT return null or [] if the information is present in the ocr_text.
+  • country  – the country of origin or manufacture. Only null if truly not visible.
+  • materials – an array of {fiber, pct} objects for the fabric composition. Parse percentages and fiber names from ocr_text (e.g. "80%SILK" → {fiber:"Silk",pct:80}). Only [] if truly not visible.
+  • care – an object with exactly four keys: washing, drying, ironing, dry_cleaning. Each key must be present and set to one of the allowed values below, or null if not visible.
+    - washing: machine_wash_cold, machine_wash_warm, machine_wash_hot, machine_wash_gentle, hand_wash_cold, hand_wash_warm
+    - drying: tumble_dry_low, tumble_dry_medium, tumble_dry_high, lay_flat_to_dry, line_dry, do_not_tumble_dry
+    - ironing: iron_low, iron_medium, iron_high, do_not_iron
+    - dry_cleaning: dry_clean, dry_clean_only
+IMPORTANT: If ocr_text contains country or material info, you MUST extract it into the structured fields. Do not leave them null/empty when the data is in ocr_text.
+Return ONLY the JSON object. Do not return care as a string. Be precise with percentages, fiber names, and care keys.`;
 
 const TAG_SCHEMA = {
   type: "json_schema",
@@ -19,6 +30,7 @@ const TAG_SCHEMA = {
     schema: {
       type: "object",
       properties: {
+        ocr_text: { type: "string" },
         country: { type: ["string", "null"] },
         materials: {
           type: "array",
@@ -78,7 +90,7 @@ const TAG_SCHEMA = {
           additionalProperties: false,
         },
       },
-      required: ["country", "materials", "care"],
+      required: ["ocr_text", "country", "materials", "care"],
       additionalProperties: false,
     },
   },
@@ -109,7 +121,7 @@ export async function extractTagFromImage(dataUrl) {
           { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
           {
             type: "text",
-            text: "Extract the country, materials, and care instructions from this clothing tag image.",
+            text: "First read ALL visible text on this clothing tag image, then extract the country, materials, and care instructions from it.",
           },
         ],
       },
