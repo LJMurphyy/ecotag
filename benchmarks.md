@@ -95,3 +95,35 @@ Key formulas:
 | Latency Overhead (ms)        | 0.00            | 12.23           | 291.96          | 131.83          | —                                      |
 
 Note: All these runs were from COLD starts
+
+---
+
+# Mobile On-Device Cache Benchmark Summary
+
+Strategy: Exact match only (SHA-256 hash of image bytes → local SQLite lookup).
+Eviction policy: FIFO, max 100 entries.
+Test dataset: 76 images from `cropped_tags`, 3 repeat passes (228 total lookups).
+Backend: `MOCK_OCR=true CACHE_ENABLED=false` (no server-side cache, measures real network cost).
+Script: `backend/benchmarks/mobile_cache_benchmark.js`
+
+Pass structure: Pass 1 = all MISS (cold cache), Passes 2–3 = all HIT (warm cache).
+
+|          Metric           | MISS (cold)  | HIT (warm) | Notes                                           |
+|:-------------------------:|:------------:|:----------:|-------------------------------------------------|
+| Total Runs                | 76           | 152        | 228 total across 3 passes                       |
+| Hit Rate                  | 0%           | 66.7%      | 152 / 228 total lookups                         |
+| Mean Latency (ms)         | 202.57       | 1.45       | End-to-end including network on MISS            |
+| p50 Latency (ms)          | 183.41       | 1.12       | —                                               |
+| p95 Latency (ms)          | 368.82       | 3.66       | —                                               |
+| Min Latency (ms)          | 57.61        | 0.23       | —                                               |
+| Max Latency (ms)          | 582.66       | 8.66       | —                                               |
+| Avg Hash Cost (ms)        | 1.25         | 1.25       | SHA-256 dominates; same cost on hit or miss     |
+| Avg Lookup Cost (ms)      | 0.05         | 0.05       | SQLite query is near-free                       |
+| Avg Network Cost (ms)     | 201.43       | —          | MISS only — skipped entirely on HIT             |
+| Avg Store Cost (ms)       | 0.13         | —          | MISS only — written after backend response      |
+| Embedding Cost (ms)       | 0.00         | 0.00       | No ML embedding — exact match only              |
+| Avg Time Saved per HIT    | —            | 201.12 ms  | Network round-trip eliminated                   |
+| Latency Reduction         | —            | **99.3%**  | —                                               |
+| Eviction Policy           | —            | FIFO       | Oldest inserted entry dropped at 200 entries    |
+| Storage                   | —            | On-device  | Local SQLite, no network required on HIT        |
+
