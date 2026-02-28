@@ -37,7 +37,7 @@ export default function LoadingScreen() {
 
       metrics.mark("uploadStart");
       try {
-        const response = await tagImage(imageUri);
+        const { response, scanId } = await tagImage(imageUri);
         metrics.mark("uploadEnd");
         metrics.logToConsole();
         router.replace({
@@ -45,6 +45,7 @@ export default function LoadingScreen() {
           params: {
             status: "success",
             data: JSON.stringify(response),
+            scanId,
           },
         });
       } catch (err) {

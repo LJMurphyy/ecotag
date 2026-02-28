@@ -1,18 +1,14 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors, typography, spacing } from "../src/theme";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { CO2Gauge } from "../src/components/CO2Gauge";
 import { BreakdownRow } from "../src/components/BreakdownRow";
 import { TagApiResponse, BREAKDOWN_LABELS, BREAKDOWN_ORDER } from "../src/types/api";
-
-function formatCareValue(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return value.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-}
+import { getScanById, toggleClosetStatus } from "../src/storage/scans";
 
 function getFriendlyErrorMessage(code?: string, fallback?: string): string {
   if (code === "MISSING_IMAGE") {
@@ -29,12 +25,32 @@ function getFriendlyErrorMessage(code?: string, fallback?: string): string {
 
 export default function ResultsScreen() {
   const router = useRouter();
-  const { status, data, errorCode, errorMessage } = useLocalSearchParams<{
-    status?: string;
-    data?: string;
-    errorCode?: string;
-    errorMessage?: string;
-  }>();
+  const { status, data, errorCode, errorMessage, scanId } =
+    useLocalSearchParams<{
+      status?: string;
+      data?: string;
+      errorCode?: string;
+      errorMessage?: string;
+      scanId?: string;
+    }>();
+
+  const [isInCloset, setIsInCloset] = useState(false);
+
+  useEffect(() => {
+    if (scanId) {
+      const scan = getScanById(scanId);
+      if (scan) {
+        setIsInCloset(scan.in_closet === 1);
+      }
+    }
+  }, [scanId]);
+
+  const handleToggleCloset = () => {
+    if (!scanId) return;
+    const next = !isInCloset;
+    toggleClosetStatus(scanId, next);
+    setIsInCloset(next);
+  };
 
   const successPayload = useMemo(() => {
     if (data) {
@@ -49,11 +65,7 @@ export default function ResultsScreen() {
   }, [data]);
 
   const isSuccess = status === "success" && !!successPayload;
-  const parsed = successPayload?.parsed;
   const emissions = successPayload?.emissions;
-  const materialSummary = parsed?.materials
-    ?.map((m) => `${m.pct}% ${m.fiber}`)
-    .join(", ");
   const friendlyMessage = getFriendlyErrorMessage(errorCode, errorMessage);
 
   const breakdownRows = useMemo(() => {
@@ -71,12 +83,24 @@ export default function ResultsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="close" size={28} color={colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Results</Text>
-        <Pressable>
-          <Ionicons name="bookmark-outline" size={24} color={colors.text} />
+        <Pressable style={styles.hangerButton} onPress={handleToggleCloset}>
+          <MaterialCommunityIcons
+            name="hanger"
+            size={28}
+            color={isInCloset ? colors.primary : colors.text}
+          />
+          <View
+            style={[
+              styles.plusBadge,
+              isInCloset && styles.plusBadgeActive,
+            ]}
+          >
+            <Ionicons name="add" size={14} color={isInCloset ? colors.white : colors.text} />
+          </View>
         </Pressable>
       </View>
 
@@ -88,8 +112,9 @@ export default function ResultsScreen() {
           <>
             <CO2Gauge totalKgCO2e={emissions!.total_kgco2e} />
 
-            <View style={styles.card}>
-              <Text style={styles.successTitle}>Emissions Breakdown</Text>
+            <Text style={styles.sectionTitle}>Carbon Emission Breakdown</Text>
+
+            <View style={styles.breakdownList}>
               {breakdownRows.map((row) => (
                 <BreakdownRow
                   key={row.key}
@@ -97,31 +122,6 @@ export default function ResultsScreen() {
                   kgValue={row.value}
                 />
               ))}
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.successTitle}>Tag Details</Text>
-              {parsed?.country ? (
-                <Text style={styles.rowLabel}>
-                  Country: <Text style={styles.rowValue}>{parsed.country}</Text>
-                </Text>
-              ) : null}
-              <Text style={styles.rowLabel}>
-                Materials:{" "}
-                <Text style={styles.rowValue}>{materialSummary || "Not detected"}</Text>
-              </Text>
-              {[
-                { label: "Washing", value: formatCareValue(parsed?.care.washing) },
-                { label: "Drying", value: formatCareValue(parsed?.care.drying) },
-                { label: "Ironing", value: formatCareValue(parsed?.care.ironing) },
-                { label: "Dry cleaning", value: formatCareValue(parsed?.care.dry_cleaning) },
-              ]
-                .filter((row) => row.value !== null)
-                .map((row) => (
-                  <Text key={row.label} style={styles.rowLabel}>
-                    {row.label}: <Text style={styles.rowValue}>{row.value}</Text>
-                  </Text>
-                ))}
             </View>
           </>
         ) : (
@@ -134,11 +134,13 @@ export default function ResultsScreen() {
           </View>
         )}
 
-        <PrimaryButton
-          label="Scan Another"
-          icon="leaf-outline"
-          onPress={() => router.replace("/scan")}
-        />
+        <View style={styles.scanAnotherWrapper}>
+          <PrimaryButton
+            label="Scan Another"
+            icon="leaf-outline"
+            onPress={() => router.replace("/scan")}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -157,34 +159,47 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   headerTitle: {
-    ...typography.h2,
+    ...typography.h1,
     color: colors.text,
+    letterSpacing: 0.48,
+  },
+  hangerButton: {
+    width: 50,
+    height: 47,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plusBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plusBadgeActive: {
+    backgroundColor: colors.primary,
   },
   content: {
     paddingHorizontal: spacing.screenH,
-    paddingTop: spacing.elementV,
+    paddingTop: spacing.elementV * 2,
     paddingBottom: 40,
-    gap: spacing.elementV * 2,
   },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: spacing.radius,
-    backgroundColor: colors.white,
-    padding: spacing.elementV,
+  sectionTitle: {
+    ...typography.subtitle1,
+    color: colors.text,
+    letterSpacing: 0.32,
+    marginTop: 40,
+  },
+  breakdownList: {
+    marginTop: 16,
     gap: 10,
   },
-  successTitle: {
-    ...typography.h2,
-    color: colors.text,
-  },
-  rowLabel: {
-    ...typography.bodySmall,
-    color: colors.disabled,
-  },
-  rowValue: {
-    ...typography.body,
-    color: colors.text,
+  scanAnotherWrapper: {
+    marginTop: 30,
   },
   errorCard: {
     borderWidth: 1,

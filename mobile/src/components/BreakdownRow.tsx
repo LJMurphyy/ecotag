@@ -1,57 +1,57 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, View } from "react-native";
 import { colors, typography, spacing } from "../theme";
 
 interface Props {
   label: string;
   kgValue: number;
-  onPress?: () => void;
 }
 
-export function BreakdownRow({ label, kgValue, onPress }: Props) {
+export function BreakdownRow({ label, kgValue }: Props) {
   return (
-    <Pressable style={styles.row} onPress={onPress}>
-      <View style={styles.left}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.value}>{kgValue.toFixed(1)} kg</Text>
+    <View style={styles.card}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>{Math.round(kgValue)} kg</Text>
       </View>
-      <View style={styles.right}>
-        <Text style={styles.details}>VIEW DETAILS</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.disabled} />
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: colors.background,
+    borderRadius: spacing.radius,
+    height: 60,
+    paddingHorizontal: 15,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  left: {
-    gap: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
   },
   label: {
-    ...typography.subtitle2,
+    ...typography.subtitle1,
     color: colors.text,
+    letterSpacing: 0.32,
   },
-  value: {
-    ...typography.bodySmall,
-    color: colors.disabled,
-  },
-  right: {
-    flexDirection: "row",
+  badge: {
+    backgroundColor: colors.primaryMid,
+    borderRadius: spacing.radius,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 70,
     alignItems: "center",
-    gap: spacing.iconTextGap,
   },
-  details: {
-    ...typography.bodySmall,
-    color: colors.disabled,
-    letterSpacing: 0.5,
+  badgeText: {
+    fontFamily: typography.h2.fontFamily,
+    fontSize: 20,
+    lineHeight: 25,
+    letterSpacing: 0.4,
+    color: colors.white,
   },
 });
