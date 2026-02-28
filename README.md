@@ -1,171 +1,211 @@
 # EcoTag: Estimating Garment Carbon Footprint from Clothing Labels
 
-## Overview
+EcoTag is a mobile app that estimates the carbon footprint of clothing items by scanning garment care tags. Point your phone camera at a clothing label, and EcoTag uses AI to read the materials, manufacturing origin, and care instructions, then calculates total CO2 emissions across the garment's lifecycle.
 
-This project estimates the carbon footprint of clothing items by analyzing garment care tags using Optical Character Recognition (OCR). The OCR model extracts information about materials, manufacturing origin, and care instructions from clothing labels to calculate total CO₂ emissions across a garment's lifecycle.
+The project has two main parts:
 
-## To Run Code
+- **`backend/`** -- A Node.js server that receives clothing tag images, sends them to OpenAI's vision model for analysis, and calculates CO2 emissions.
+- **`mobile/`** -- A React Native (Expo) mobile app with a camera interface for scanning tags and viewing results.
 
-### Prerequisites
+---
 
-- Python 3.8+
-- pip
+## Table of Contents
 
-### Dependencies
+1. [Requirements](#requirements)
+2. [Getting an OpenAI API Key](#getting-an-openai-api-key)
+3. [Backend Setup](#backend-setup)
+4. [Mobile App Setup](#mobile-app-setup)
+   - [Option A: iOS Simulator on Mac (Xcode)](#option-a-ios-simulator-on-mac-xcode)
+   - [Option B: Real iPhone with Expo Go](#option-b-real-iphone-with-expo-go)
+5. [Using the App](#using-the-app)
+6. [Troubleshooting](#troubleshooting)
+7. [Android Support](#android-support)
+8. [Running Without an OpenAI Key (Mock Mode)](#running-without-an-openai-key-mock-mode)
 
-Install required packages:
+---
 
-```bash
-pip install easyocr opencv-python numpy pandas matplotlib seaborn tqdm codecarbon pillow pytesseract paddleocr
-```
+## Requirements
 
-### Usage
+You need the following installed on your Mac:
 
-To see the CO2 emissions of a single tag image:
+- **Node.js v18 or newer** -- Download the LTS version from [nodejs.org](https://nodejs.org), run the installer, then verify with `node --version` in Terminal.
+- **Git** -- Run `git --version` in Terminal. If not installed, macOS will prompt you to install the Command Line Developer Tools.
 
-```bash
-cd code
-python demo.py --image ../cropped_tags/[IMG_NAME].JPG
-```
+---
 
-Example output:
+## Getting an OpenAI API Key
 
-```json
-=== PARSED TAG ===
-{
-  "materials": [
-    {"fiber": "cotton", "pct": 100.0}
-  ],
-  "origin": "guatemala",
-  "care": {
-    "wash": "cold",
-    "dry": "tumble",
-    "dry_clean": "none",
-    "washes_per_month": 2.0
-  }
-}
+EcoTag uses OpenAI's vision model to read clothing tag images. You'll need an API key.
 
-=== RESULTS ===
-{
-  "total": 12.456,
-  "breakdown": {
-    "materials": 5.230,
-    "manufacturing": 0.500,
-    "washing": 6.726
-  },
-  "assumptions": {
-    "weight_g": "1000",
-    "origin": "guatemala",
-    "washes_lifetime": "48"
-  }
-}
-```
+1. Create an account (or sign in) at [platform.openai.com](https://platform.openai.com/signup)
+2. Go to [API keys](https://platform.openai.com/api-keys) and click **"Create new secret key"**
+3. Name it (e.g., "EcoTag") and click **Create**
+4. **Copy the key immediately** -- it starts with `sk-proj-` and won't be shown again
 
-## CO₂ Emission Factors
+> **Note:** OpenAI API usage is pay-per-use. Each tag scan costs a few cents. New accounts typically receive free credits.
 
-The calculation is based on emission factors in `co2factors.py`:
+---
 
-- **Materials**: kg CO₂/kg for cotton, polyester, wool, etc.
-- **Manufacturing**: kg CO₂/kg by country
-- **Washing**: kg CO₂ per wash cycle (cold, warm, hot)
-- **Drying**: kg CO₂ per tumble dry cycle
+## Backend Setup
 
-Default assumptions:
-
-- Garment lifetime: 2 years
-- Washes per month: 2
-- Total washes: 48
-
-CO₂ emission factors based on apparel lifecycle assessment literature.
-
-## Carbon Tracking
-
-This project uses CodeCarbon to track computational emissions during OCR processing. Logs are saved to `codecarbon_logs/emissions.csv`.
-
-## Run Mobile Against Local Backend
-
-1. Start backend API:
+### 1. Navigate to the backend directory
 
 ```bash
-cd backend
-node server.js
+cd ecotag/backend
 ```
 
-2. Configure mobile API base URL (optional override):
-
-- Default in mobile is `http://localhost:3001`.
-- You can override with an env var:
+### 2. Install dependencies
 
 ```bash
-cd mobile
-EXPO_PUBLIC_API_BASE_URL=http://YOUR_IP:3001 npm run start
-```
-
-3. Simulator vs real device:
-
-- iOS Simulator can usually use `http://localhost:3001`.
-- Android Emulator usually needs `http://10.0.2.2:3001`.
-- Real device needs your machine LAN IP (for example `http://192.168.1.25:3001`).
-
-4. API behavior:
-
-- Mobile uploads images to `POST /api/tag` as `multipart/form-data` with field `image`.
-- If backend AI provider/API key is missing, backend may return `502` (`UPSTREAM_ERROR`).
-
-## Test Semantic Cache Without API Keys
-
-You can test cache hit rate, false positives, and cache overhead without OpenAI keys by enabling mock OCR mode.
-
-1. Install backend dependencies:
-
-```bash
-cd backend
 npm install
 ```
 
-2. Start backend in mock+cache mode:
+### 3. Set up your environment file
 
 ```bash
-MOCK_OCR=1 CACHE_ENABLED=1 node server.js
+cp .env.example .env
 ```
 
-3. Run benchmark against local image set:
+Open `backend/.env` in any text editor and replace the placeholder with your real OpenAI key:
+
+```
+OPENAI_API_KEY=sk-proj-your-actual-key-here
+```
+
+### 4. Start the server
 
 ```bash
-node benchmarks/vlm_benchmark.js \
-  --url http://localhost:3001/api/tag \
-  --images-dir ../cropped_tags \
-  --runs 200 \
-  --concurrency 4
+node server.js
 ```
 
-The benchmark script now resets backend cache automatically at the start of each run
-by calling `POST /api/cache/reset`, so repeating the same benchmark command starts
-from a cold cache each time.
+You should see:
 
-Useful cache env vars:
+```
+Server running on port 3001
+```
 
-- `CACHE_SIMILARITY_THRESHOLD` (default `0.90`)
-- `CACHE_DB_PATH` (default `./cache/ecotag-cache.sqlite`)
-- `CACHE_MAX_ENTRIES` (default `5000`)
-- `CACHE_FINGERPRINT_VERSION` (default `v1`)
-- `CACHE_MODE` (`exact`, `semantic`, `tiered`; default `tiered`)
-- `CACHE_SEMANTIC_EMBEDDER` (`clip` or `fingerprint`; default `clip`)
-- `CACHE_SEMANTIC_CLIP_MODEL` (default `Xenova/clip-vit-base-patch32`)
-- `CACHE_SEMANTIC_FALLBACK` (`none` or `fingerprint`; default `none`)
+**Leave this Terminal window open** -- the server needs to stay running. Open a new Terminal window/tab for the mobile app.
 
-Benchmark commands by mode:
+---
+
+## Mobile App Setup
+
+There are two ways to run the mobile app:
+
+- **Option A:** iOS Simulator on your Mac (no physical iPhone needed)
+- **Option B:** Expo Go on a real iPhone (full camera access)
+
+### Option A: iOS Simulator on Mac (Xcode)
+
+#### 1. Install Xcode
+
+1. Open the **App Store** on your Mac and search for **"Xcode"**
+2. Click **Get / Install** (large download, ~10-12 GB)
+3. Once installed, **open Xcode once** to accept the license agreement and install additional components
+
+#### 2. Install an iOS Simulator runtime
+
+1. In Xcode, go to **Xcode > Settings > Platforms**
+2. If no iOS simulator is listed, click **+** and download the latest iOS version
+
+> Already have Xcode? Verify simulators are available with `xcrun simctl list devices available` in Terminal.
+
+#### 3. Install dependencies and start
+
+Open a **new Terminal window** (keep the backend running):
 
 ```bash
-# Baseline (cache off)
-MOCK_OCR=1 CACHE_ENABLED=0 node server.js
-
-# Exact-only cache
-MOCK_OCR=1 CACHE_ENABLED=1 CACHE_MODE=exact node server.js
-
-# Semantic-only cache
-MOCK_OCR=1 CACHE_ENABLED=1 CACHE_MODE=semantic node server.js
-
-# Tiered cache (exact + semantic)
-MOCK_OCR=1 CACHE_ENABLED=1 CACHE_MODE=tiered node server.js
+cd ecotag/mobile
+npm install
+npx expo start --ios
 ```
+
+This starts the Expo dev server, opens the iOS Simulator, and installs the app. The first launch may take a couple of minutes.
+
+> **Note:** The iOS Simulator has no real camera. Use the gallery icon in the app to pick a photo of a clothing tag from your Mac's photo library instead.
+
+---
+
+### Option B: Real iPhone with Expo Go
+
+#### 1. Install Expo Go
+
+Download **"Expo Go"** from the App Store on your iPhone.
+
+#### 2. Connect to the same Wi-Fi
+
+Make sure your iPhone and Mac are on the **same Wi-Fi network**.
+
+#### 3. Install dependencies and start
+
+Open a **new Terminal window** (keep the backend running):
+
+```bash
+cd ecotag/mobile
+npm install
+npx expo start
+```
+
+#### 4. Scan the QR code
+
+A QR code will appear in Terminal. Open the **Camera** app on your iPhone, point it at the QR code, and tap the notification to open the app in Expo Go.
+
+> **Backend connection:** The app automatically detects your Mac's IP address from the Expo dev server and connects to the backend on port 3001 -- no manual configuration needed.
+>
+> **If the app can't reach the backend**, auto-detection may not work on your network. Find your Mac's IP (System Settings > Wi-Fi > Details, or `ipconfig getifaddr en0` in Terminal) and start with:
+> ```bash
+> EXPO_PUBLIC_API_BASE_URL=http://YOUR_IP:3001 npx expo start
+> ```
+
+---
+
+## Using the App
+
+1. **Scan** -- Open the Scan tab, point your camera at a clothing tag, and take a photo (or pick one from your photo library)
+2. **Results** -- The app sends the image to the backend for AI analysis, then shows the extracted materials, country of origin, care instructions, and a CO2 emissions breakdown. You can save a scan to your closet from the results screen.
+3. **Home** -- View your most recent scans
+4. **Closet** -- Use the dropdown to switch between "Your Closet" (garments you've saved) and "Recent Scans" (all past scans). You can search, edit, and delete items from either view.
+
+---
+
+## Troubleshooting
+
+### "Unable to reach backend"
+
+- Make sure the backend is still running (`Server running on port 3001` in Terminal)
+- If on a real iPhone, confirm your phone and Mac are on the **same Wi-Fi**
+- If auto-detection isn't working, set `EXPO_PUBLIC_API_BASE_URL` explicitly (see [Option B](#option-b-real-iphone-with-expo-go))
+
+### Backend returns 502 (UPSTREAM_ERROR)
+
+- Your OpenAI API key is likely missing or invalid
+- Check `backend/.env` and verify `OPENAI_API_KEY` is set correctly (starts with `sk-proj-`, no extra spaces)
+
+### Xcode / simulator issues
+
+- Make sure Xcode has been opened at least once and components are installed
+- Verify a simulator runtime is downloaded (Xcode > Settings > Platforms)
+
+### npm install fails
+
+- Confirm Node.js v18+ is installed (`node --version`)
+- Try removing `node_modules` and reinstalling: `rm -rf node_modules && npm install`
+
+---
+
+## Android Support
+
+Android has **not been tested yet**. The app includes Android configuration in `app.json`, but it has not been verified on Android devices or emulators. This is planned for a future milestone.
+
+---
+
+## Running Without an OpenAI Key (Mock Mode)
+
+To try the app without an OpenAI key, start the backend in mock mode:
+
+```bash
+cd backend
+MOCK_OCR=1 node server.js
+```
+
+This returns fake (but realistic-looking) tag data instead of calling the AI. Useful for testing the full app flow without any API costs.
