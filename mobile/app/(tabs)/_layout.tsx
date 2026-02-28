@@ -1,6 +1,7 @@
 import React from "react";
+import { Platform } from "react-native";
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors, typography } from "../../src/theme";
 
 export default function TabLayout() {
@@ -8,14 +9,32 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.disabled,
+        tabBarActiveTintColor: colors.primaryMid,
+        tabBarInactiveTintColor: colors.text,
         tabBarLabelStyle: {
           fontFamily: typography.bodySmall.fontFamily,
-          fontSize: 11,
+          fontSize: 12,
+          letterSpacing: 0.24,
         },
         tabBarStyle: {
-          borderTopColor: colors.border,
+          position: "absolute",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          borderTopWidth: 0,
+          backgroundColor: colors.background,
+          paddingTop: 12,
+          height: Platform.OS === "ios" ? 100 : 70,
+          ...Platform.select({
+            ios: {
+              shadowColor: "#000",
+              shadowOffset: { width: 1, height: 0 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+            },
+            android: {
+              elevation: 8,
+            },
+          }),
         },
       }}
     >
@@ -33,16 +52,20 @@ export default function TabLayout() {
         options={{
           title: "Scan",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="leaf-outline" size={size} color={color} />
+            <Ionicons name="scan" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="closet"
         options={{
-          title: "History",
+          title: "Closet",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="wardrobe-outline"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
