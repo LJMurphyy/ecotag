@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing } from "../theme";
 
@@ -7,14 +7,15 @@ interface Props {
   label: string;
   onPress: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
+  style?: ViewStyle;
 }
 
-export function PrimaryButton({ label, onPress, icon }: Props) {
+export function PrimaryButton({ label, onPress, icon, style }: Props) {
   const [pressed, setPressed] = useState(false);
 
   return (
     <Pressable
-      style={[styles.button, pressed && styles.pressed]}
+      style={[styles.button, pressed && styles.pressed, style]}
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   label: {
-    ...typography.button,
+    ...typography.subtitle1,
     color: colors.white,
   },
 });

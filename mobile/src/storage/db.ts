@@ -1,7 +1,7 @@
 import { SQLiteDatabase, openDatabaseSync } from "expo-sqlite";
 
 const DB_NAME = "ecotag.db";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 let db: SQLiteDatabase | null = null;
 
@@ -36,6 +36,14 @@ export function initDb(): void {
       CREATE INDEX IF NOT EXISTS idx_scans_created_at ON scans(created_at DESC);
     `);
   }
+
+  // Always ensure settings table exists regardless of version state
+  database.execSync(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
+  `);
 
   if (currentVersion !== SCHEMA_VERSION) {
     database.execSync(`PRAGMA user_version = ${SCHEMA_VERSION};`);

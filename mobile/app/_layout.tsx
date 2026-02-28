@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import {
@@ -17,6 +17,10 @@ import { initDb } from "../src/storage/db";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // useState lazy initializer runs synchronously on first render,
+  // inside React's lifecycle so native modules are ready
+  useState(() => initDb());
+
   const [fontsLoaded] = useFonts({
     Figtree_400Regular,
     Figtree_500Medium,
@@ -29,10 +33,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
-
-  useEffect(() => {
-    initDb();
-  }, []);
 
   if (!fontsLoaded) {
     return null;
@@ -48,7 +48,10 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
+          <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="splash" />
           <Stack.Screen name="results" />
           <Stack.Screen name="loading" />
         </Stack>
