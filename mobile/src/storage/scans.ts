@@ -51,12 +51,82 @@ export function addScan(input: NewScanRecord): string {
 export function listScans(limit = 50, offset = 0): ScanRecord[] {
   const db = getDb();
   return db.getAllSync<ScanRecord>(
-    `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json
+    `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json, in_closet
      FROM scans
      ORDER BY created_at DESC
      LIMIT ? OFFSET ?`,
     limit,
     offset,
+  );
+}
+
+export function getScanById(id: string): ScanRecord | null {
+  const db = getDb();
+  return (
+    db.getFirstSync<ScanRecord>(
+      `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json, in_closet
+       FROM scans WHERE id = ?`,
+      id,
+    ) ?? null
+  );
+}
+
+export function toggleClosetStatus(scanId: string, inCloset: boolean): void {
+  getDb().runSync(
+    `UPDATE scans SET in_closet = ? WHERE id = ?`,
+    inCloset ? 1 : 0,
+    scanId,
+  );
+}
+
+export function listClosetItems(limit = 50, offset = 0): ScanRecord[] {
+  const db = getDb();
+  return db.getAllSync<ScanRecord>(
+    `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json, in_closet
+     FROM scans
+     WHERE in_closet = 1
+     ORDER BY created_at DESC
+     LIMIT ? OFFSET ?`,
+    limit,
+    offset,
+  );
+}
+
+export function searchScans(
+  query: string,
+  closetOnly: boolean,
+  limit = 50,
+): ScanRecord[] {
+  const db = getDb();
+  const pattern = `%${query}%`;
+  if (closetOnly) {
+    return db.getAllSync<ScanRecord>(
+      `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json, in_closet
+       FROM scans
+       WHERE in_closet = 1 AND display_name LIKE ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      pattern,
+      limit,
+    );
+  }
+  return db.getAllSync<ScanRecord>(
+    `SELECT id, created_at, success, co2e_grams, display_name, category, error_code, result_json, in_closet
+     FROM scans
+     WHERE display_name LIKE ?
+     ORDER BY created_at DESC
+     LIMIT ?`,
+    pattern,
+    limit,
+  );
+}
+
+export function deleteScans(ids: string[]): void {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => "?").join(",");
+  getDb().runSync(
+    `DELETE FROM scans WHERE id IN (${placeholders})`,
+    ...ids,
   );
 }
 

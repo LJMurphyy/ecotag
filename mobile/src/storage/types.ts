@@ -7,6 +7,7 @@ export interface ScanRecord {
   category: string | null;
   error_code: string | null;
   result_json: string | null;
+  in_closet: 0 | 1;
 }
 
 export interface NewScanRecord {

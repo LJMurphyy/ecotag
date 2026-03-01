@@ -1,7 +1,7 @@
 import { SQLiteDatabase, openDatabaseSync } from "expo-sqlite";
 
 const DB_NAME = "ecotag.db";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 let db: SQLiteDatabase | null = null;
 
@@ -45,6 +45,13 @@ export function initDb(): void {
         response_json TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+    `);
+  }
+
+  if (currentVersion < 3) {
+    database.execSync(`
+      ALTER TABLE scans ADD COLUMN in_closet INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX IF NOT EXISTS idx_scans_in_closet ON scans(in_closet);
     `);
   }
 
