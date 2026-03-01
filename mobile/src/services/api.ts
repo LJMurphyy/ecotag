@@ -1,6 +1,12 @@
 import Constants from "expo-constants";
 import { addScan } from "../storage/scans";
+import { lookupCache, storeCache } from "../storage/imageCache";
 import { ParsedTag, TagApiResponse } from "../types/api";
+
+export interface TagImageResult {
+  response: TagApiResponse;
+  scanId: string;
+}
 
 export interface NormalizedApiError {
   status: number;
@@ -88,10 +94,11 @@ function recordScan(params: {
   category: string | null;
   error_code: string | null;
   result: unknown;
-}): void {
+}): string {
+  const id = makeScanId();
   try {
     addScan({
-      id: makeScanId(),
+      id,
       created_at: Date.now(),
       success: params.success,
       co2e_grams: params.co2e_grams,
@@ -103,6 +110,7 @@ function recordScan(params: {
   } catch (err) {
     console.warn("[EcoTag] Failed to write scan history:", err);
   }
+  return id;
 }
 
 function normalizeErrorPayload(
@@ -129,7 +137,20 @@ function normalizeErrorPayload(
   };
 }
 
-export async function tagImage(imageUri: string): Promise<TagApiResponse> {
+export async function tagImage(imageUri: string): Promise<TagImageResult> {
+  const cached = await lookupCache(imageUri);
+  if (cached) {
+    const scanId = recordScan({
+      success: 1,
+      co2e_grams: Math.round(cached.emissions.total_kgco2e * 1000),
+      display_name: buildDisplayName(cached.parsed),
+      category: null,
+      error_code: null,
+      result: { parsed: cached.parsed, emissions: cached.emissions },
+    });
+    return { response: cached, scanId };
+  }
+
   const formData = new FormData();
   formData.append("image", {
     uri: imageUri,
@@ -201,7 +222,8 @@ export async function tagImage(imageUri: string): Promise<TagApiResponse> {
   }
 
   const response = parsed as TagApiResponse;
-  recordScan({
+  await storeCache(imageUri, response);
+  const scanId = recordScan({
     success: 1,
     co2e_grams: Math.round(response.emissions.total_kgco2e * 1000),
     display_name: buildDisplayName(response.parsed),
@@ -210,5 +232,5 @@ export async function tagImage(imageUri: string): Promise<TagApiResponse> {
     result: { parsed: response.parsed, emissions: response.emissions },
   });
 
-  return response;
+  return { response, scanId };
 }
