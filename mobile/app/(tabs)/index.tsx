@@ -37,7 +37,7 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Recent Scans</Text>
           <Text
             style={styles.viewAll}
-            onPress={() => router.push("/history")}
+            onPress={() => router.push("/closet")}
           >
             View All
           </Text>
@@ -57,7 +57,11 @@ export default function HomeScreen() {
                   if (scan.result_json && scan.success === 1) {
                     router.push({
                       pathname: "/results",
-                      params: { status: "success", data: scan.result_json },
+                      params: {
+                        status: "success",
+                        data: scan.result_json,
+                        scanId: scan.id,
+                      },
                     });
                   }
                 }}
