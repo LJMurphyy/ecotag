@@ -4,9 +4,10 @@
 import dotenv from "dotenv";
 import OpenAI from "openai";
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
+}
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = "gpt-5.2";
 
 const SYSTEM_PROMPT = `You are an expert at reading clothing care/composition tags.
@@ -99,13 +100,14 @@ const TAG_SCHEMA = {
 let openaiClient = null;
 
 function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
   if (openaiClient) {
     return openaiClient;
   }
-  if (!OPENAI_API_KEY) {
+  if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
   }
-  openaiClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+  openaiClient = new OpenAI({ apiKey });
   return openaiClient;
 }
 

@@ -37,6 +37,13 @@ export function initDb(): void {
     `);
   }
 
+  // Always ensure settings table exists regardless of version state
+  database.execSync(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
+  `);
   // check the schema version and create the image cache table if it doesn't exist
   if (currentVersion < 2) {
     database.execSync(`

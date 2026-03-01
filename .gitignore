@@ -16,3 +16,5 @@ backend/cache/semantic.sqlite
 backend/cache/test-cache-service.sqlite
 backend/cache/test-tag-e2e.sqlite
 backend/uploads/
+
+CLAUDE.md
