@@ -127,3 +127,31 @@ Pass structure: Pass 1 = all MISS (cold cache), Passes 2–3 = all HIT (warm cac
 | Eviction Policy           | —            | FIFO       | Oldest inserted entry dropped at 200 entries    |
 | Storage                   | —            | On-device  | Local SQLite, no network required on HIT        |
 
+---
+
+# E2E Cache Benchmark
+
+Strategy: Exact match (SHA-256 of image bytes → local SQLite).
+Dataset: 76 images from `cropped_tags`.
+Backend: GCP Cloud Run (`gpt-5.2` VLM).
+
+Phase 1 (cold) = empty cache, all images sent to VLM (MISS).
+Phase 2 (warm) = same images replayed, all served from local cache (HIT).
+
+|         Metric          | MISS (cold) | HIT (warm) | Notes                                                        |
+|:-----------------------:|:-----------:|:----------:|--------------------------------------------------------------|
+| Requests                | 76          | 76         | Same 76 images both phases                                   |
+| Hit Rate                | 0%          | 100%       | —                                                            |
+| Errors                  | 0           | 0          | —                                                            |
+| Mean Latency (ms)       | 3607.08     | 5.00       | —                                                            |
+| p50 Latency (ms)        | 3594.82     | 4.77       | —                                                            |
+| p95 Latency (ms)        | 5174.12     | 9.29       | —                                                            |
+| p99 Latency (ms)        | 6334.35     | 10.60      | —                                                            |
+| Min Latency (ms)        | 1743.56     | 1.21       | —                                                            |
+| Max Latency (ms)        | 6334.35     | 10.60      | —                                                            |
+| Avg Hash Cost (ms)      | 11.43       | 4.97       | File read + SHA-256; slightly faster on HIT (no VLM I/O contention) |
+| Avg Lookup Cost (ms)    | 0.15        | 0.03       | SQLite query near-free                                       |
+| Avg VLM Cost (ms)       | 3591.12     | —          | Eliminated entirely on HIT                                   |
+| Avg Store Cost (ms)     | 3.62        | —          | SQLite write + FIFO eviction                                 |
+| **Cache Speedup**       | —           | **~721x**  | 3607ms → 5ms mean latency                                    |
+| Latency Reduction       | —           | **99.9%**  | —                                                            |
