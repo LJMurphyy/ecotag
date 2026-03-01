@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Image, ImageSourcePropType, ImageStyle, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, typography, spacing } from "../theme";
 
@@ -7,10 +7,12 @@ interface Props {
   label: string;
   onPress: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
+  image?: ImageSourcePropType;
+  imageStyle?: ImageStyle;
   style?: ViewStyle;
 }
 
-export function PrimaryButton({ label, onPress, icon, style }: Props) {
+export function PrimaryButton({ label, onPress, icon, image, imageStyle, style }: Props) {
   const [pressed, setPressed] = useState(false);
 
   return (
@@ -21,7 +23,7 @@ export function PrimaryButton({ label, onPress, icon, style }: Props) {
       onPressOut={() => setPressed(false)}
     >
       <View style={styles.content}>
-        {icon && (
+        {icon && !image && (
           <Ionicons
             name={icon}
             size={18}
@@ -30,6 +32,13 @@ export function PrimaryButton({ label, onPress, icon, style }: Props) {
           />
         )}
         <Text style={styles.label}>{label}</Text>
+        {image && (
+          <Image
+            source={image}
+            style={[styles.image, imageStyle]}
+            resizeMode="contain"
+          />
+        )}
       </View>
     </Pressable>
   );
@@ -53,5 +62,10 @@ const styles = StyleSheet.create({
   label: {
     ...typography.subtitle1,
     color: colors.white,
+  },
+  image: {
+    width: 18,
+    height: 18,
+    marginLeft: spacing.iconTextGap,
   },
 });
