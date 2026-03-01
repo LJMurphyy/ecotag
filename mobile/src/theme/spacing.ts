@@ -2,7 +2,7 @@ export const spacing = {
   /** Corner radius for cards, buttons, inputs */
   radius: 10,
   /** Gap between icon and adjacent text */
-  iconTextGap: 6,
+  iconTextGap: 8,
   /** Horizontal padding inside elements */
   paddingH: 10,
   /** Horizontal spacing between sibling elements */
